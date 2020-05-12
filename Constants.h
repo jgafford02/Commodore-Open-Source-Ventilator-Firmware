@@ -74,7 +74,8 @@ enum States {
   BIPAP_DISABLED_STATE, // 9 (BiPAP Disabled State)
   BIPAP_WAITING_STATE,  // 10 (BiPAP Breath Waiting State)
   BIPAP_ASSIST_STATE,   // 11 (BiPAP Breath Delivery State)
-  BIPAP_BARO_STATE      // 12 (BiPAP Barotrauma Avoidance Maneuver)
+  BIPAP_BARO_STATE,      // 12 (BiPAP Barotrauma Avoidance Maneuver)
+  BIPAP_HOME_STATE      // 13 (BiPAP Homing Maneuver)
 
 };
 

@@ -120,6 +120,7 @@ bool startup_flag = true;           //toggles to false after startup sequence is
 
 //BiPAP parameters
 float idle_timeout = 10000;       //Stores idle timeout limit for BiPAP mode
+unsigned long patient_timeout = 0;  
 float trigger_pressure = -1.0;    //Stores breath trigger pressure for BiPAP mode
 bool insp_limit_tripped = false; //Stores 'true' if ventilator successfully delivered a breath
 
@@ -506,15 +507,18 @@ void breath_assist() {
     /*BiPAP Waiting State
       This state continuously monitors the pressure. Once the pressure
       drops below the trigger pressure setting, a breath is delivered.
-      Switching the Enable switch disables the ventilator.
+      If not breath is detected when an idle timeout occurs, deliver a 
+      breath and sound an alarm. Switching the Enable switch disables 
+      the ventilator.
     */
     case BIPAP_WAITING_STATE:
       if (entering_state) {
         entering_state = false;
+        patient_timeout = millis();
       }
 
-      //If a breath is requested, deliver one
-      if (pressure.get() < trigger_pressure) {
+      //If a breath is requested, or if an idle timeout occurs, deliver one
+      if ((pressure.get() < trigger_pressure)||(millis()-patient_timeout)>(idle_timeout+100)) {
         cycle_count++;
         setState(BIPAP_ASSIST_STATE);
       }
@@ -557,8 +561,8 @@ void breath_assist() {
         setState(BIPAP_WAITING_STATE);
       }
 
-      if (enable_switch.isPressed()) {
-        setState(BIPAP_DISABLED_STATE);
+      if (enable_switch.isPressed()){
+        setState(BIPAP_HOME_STATE);
       }
       break;
 
@@ -570,11 +574,27 @@ void breath_assist() {
     case BIPAP_BARO_STATE:
       if (entering_state == true) {
         entering_state = false;
-        motor.softstart(255, REV);
+        motor.softstart(MAX_SPEED, REV);
       }
       if (exp_limit.isPressed()) {
-        motor.softbrake(255, REV);
+        motor.softbrake(MAX_SPEED, REV);
         setState(BIPAP_WAITING_STATE);
+      }
+      break;
+
+
+    /*BiPAP Homing State
+       This state sends the ventilator to full expiratory position and
+       then disables.
+    */
+    case BIPAP_HOME_STATE:
+      if (entering_state == true) {
+        cycle_count = 0;
+        entering_state = false;
+      }
+      if (!exp_limit.getState()) {
+        motor.softbrake(MAX_SPEED, FORWARD);
+        setState(BIPAP_DISABLED_STATE);
       }
       break;
   }
@@ -630,7 +650,7 @@ void update_display_bipap() {
         displ.writeDisabled();
         break;
       case BIPAP_WAITING_STATE:
-        displ.writeBreathWaiting(cycle_count, pressure.get(), (millis() - tStateTimer) / 1000.0);
+        displ.writeBreathWaiting(cycle_count, pressure.get(), (millis() - patient_timeout) / 1000.0);
         break;
       case BIPAP_ASSIST_STATE:
         displ.writeBreathRequest(pressure.get(), pressure.get_max());
@@ -715,10 +735,15 @@ bool check_faults() {
   if (alarm.is_alarm_enabled()) {
 
     //Check for motor or idle timeout faults
-    bool motor_timeout = motor_timeout_check();
-    bool idle_timeout = idle_timeout_check();
-    alarm.set_motor_timeout(motor_timeout);
-    alarm.set_idle_timeout(idle_timeout);
+    bool motor_timeout_fault = motor_timeout_check();
+    bool idle_timeout_fault = idle_timeout_check();
+
+    //Carry over idle timeout if it triggered a breath during breath assist
+    if ((state == BIPAP_ASSIST_STATE || state == BIPAP_WAITING_STATE ) && alarm.get_idle_timeout()){
+      idle_timeout_fault = true;
+    }
+    alarm.set_motor_timeout(motor_timeout_fault);
+    alarm.set_idle_timeout(idle_timeout_fault);
 
     //Check for barotrauma pressure limit
     if (entering_state && state == BARO_STATE) {
@@ -803,7 +828,7 @@ void setState(States newState) {
 //Update BIPAP parameters during programming state
 void updateParamsBIPAP() {
   trigger_pressure = map2(pot1.get(), 0.0, 1024.0, 5.0, -5.0);        //Read max pressure pot and map to range
-  idle_timeout = map2(pot2.get(), 0.0, 1024.0, 1000.0, 100000.0);     //Read timeout pot and map to range
+  idle_timeout = map2(pot2.get(), 0.0, 1024.0, 100000.0, 1000.0);     //Read timeout pot and map to range
   displ.writeProgModeBIPAP(trigger_pressure, idle_timeout / 1000.0);  //update display
 }
 
