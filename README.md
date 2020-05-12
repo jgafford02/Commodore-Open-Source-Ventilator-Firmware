@@ -13,6 +13,6 @@ This code implements two modes of operation that are selectable before bootup. T
 
 The second mode of operation is a breath-assist mode, where the device is configured to deliver positive airway pressure when the patient attempts an inspiration. The state machine for this implementation is shown below:
 
-![BIPAP State Diagram](https://vandyvents.com/wp-content/uploads/2020/05/BiPAP_Diagram-1.png)
+![BIPAP State Diagram](https://vandyvents.com/wp-content/uploads/2020/05/BiPAP_Diagram-2.png)
 
 Please go to https://vandyvents.com/ for more details regarding the Commodore Open-Source Ventilator, as well as detailed plans for building your own!
